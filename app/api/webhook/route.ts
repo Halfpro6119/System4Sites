@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { scrapeWebsite, crawlWebsite } from '@/lib/services/scraper';
+import { crawlWebsite } from '@/lib/services/scraper';
 import { enrichBusinessData } from '@/lib/services/enrichment';
 import { scrapeGoogleMapsReviews, scrapeGoogleMapsReviewsWithPuppeteer } from '@/lib/services/google-maps-scraper';
 import { generateWebsiteAudit, generateEmailCampaign } from '@/lib/services/ai-generator';
@@ -17,6 +17,13 @@ interface WebhookData {
   phone_number: string;
   working_hours: string;
   Used: boolean;
+}
+
+interface ScrapedPage {
+  url: string;
+  title: string;
+  description: string;
+  content: string[];
 }
 
 function generateSlug(businessName: string): string {
@@ -79,7 +86,7 @@ export async function POST(request: NextRequest) {
 
     // Step 3: Crawl website if available
     let websiteContent = '';
-    let scrapedPages: any[] = [];
+    let scrapedPages: ScrapedPage[] = [];
     
     if (websiteUrl && websiteUrl !== 'Not Available') {
       try {

@@ -83,9 +83,10 @@ export async function scrapeGoogleMapsReviews(mapLink: string): Promise<Review[]
 // Alternative method using Puppeteer for dynamic content
 export async function scrapeGoogleMapsReviewsWithPuppeteer(mapLink: string): Promise<Review[]> {
   try {
-    const puppeteer = require('puppeteer');
+    // Dynamic import to avoid require
+    const puppeteer = await import('puppeteer');
     
-    const browser = await puppeteer.launch({
+    const browser = await puppeteer.default.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
@@ -101,7 +102,7 @@ export async function scrapeGoogleMapsReviewsWithPuppeteer(mapLink: string): Pro
     // Extract reviews
     const reviews = await page.evaluate(() => {
       const reviewElements = document.querySelectorAll('[data-review-id]');
-      const extractedReviews: any[] = [];
+      const extractedReviews: { text: string; reviewer: string; rating: number }[] = [];
 
       reviewElements.forEach((element, index) => {
         if (index < 3) { // Only get first 3 reviews
