@@ -40,15 +40,28 @@ export async function enrichBusinessData(
       console.log(`Scraping website: ${website}`);
       const websiteData = await scrapeWebsite(website);
       
-      if (websiteData.ownerName) result.ownerName = websiteData.ownerName;
+      if (websiteData.ownerName) {
+        result.ownerName = cleanName(websiteData.ownerName);
+        console.log(`Found owner name from website: ${result.ownerName}`);
+      }
       if (websiteData.emails.length > 0) {
         result.companyEmail = websiteData.emails[0];
+        console.log(`Found company email: ${result.companyEmail}`);
         // Try to find owner email
-        const ownerEmail = findOwnerEmail(websiteData.emails, websiteData.ownerName);
-        if (ownerEmail) result.ownerEmail = ownerEmail;
+        const ownerEmail = findOwnerEmail(websiteData.emails, result.ownerName);
+        if (ownerEmail) {
+          result.ownerEmail = ownerEmail;
+          console.log(`Found owner email: ${result.ownerEmail}`);
+        }
       }
-      if (websiteData.linkedin) result.linkedin = websiteData.linkedin;
-      if (websiteData.facebook) result.facebook = websiteData.facebook;
+      if (websiteData.linkedin) {
+        result.linkedin = websiteData.linkedin;
+        console.log(`Found LinkedIn: ${result.linkedin}`);
+      }
+      if (websiteData.facebook) {
+        result.facebook = websiteData.facebook;
+        console.log(`Found Facebook: ${result.facebook}`);
+      }
       if (websiteData.otherSocials.length > 0) {
         result.otherSocials = websiteData.otherSocials.join(', ');
       }
@@ -59,10 +72,12 @@ export async function enrichBusinessData(
       console.log('Searching LinkedIn...');
       const linkedinData = await searchLinkedIn(businessName, address);
       if (linkedinData.ownerName && !result.ownerName) {
-        result.ownerName = linkedinData.ownerName;
+        result.ownerName = cleanName(linkedinData.ownerName);
+        console.log(`Found owner name from LinkedIn: ${result.ownerName}`);
       }
       if (linkedinData.linkedin && !result.linkedin) {
         result.linkedin = linkedinData.linkedin;
+        console.log(`Found LinkedIn from search: ${result.linkedin}`);
       }
     }
 
@@ -70,20 +85,27 @@ export async function enrichBusinessData(
     if (!result.facebook) {
       console.log('Searching for Facebook page...');
       const facebookUrl = await searchFacebook(businessName, address);
-      if (facebookUrl) result.facebook = facebookUrl;
+      if (facebookUrl) {
+        result.facebook = facebookUrl;
+        console.log(`Found Facebook from search: ${result.facebook}`);
+      }
     }
 
     // Strategy 4: Use Hunter.io-style email pattern guessing
     if (!result.ownerEmail && result.ownerName && website) {
       console.log('Generating potential owner email...');
       result.ownerEmail = generateOwnerEmail(result.ownerName, website);
+      console.log(`Generated owner email: ${result.ownerEmail}`);
     }
 
     // Strategy 5: Extract from business registration databases (if available)
     if (!result.ownerName) {
       console.log('Searching business registries...');
       const registryData = await searchBusinessRegistry(businessName, address);
-      if (registryData.ownerName) result.ownerName = registryData.ownerName;
+      if (registryData.ownerName) {
+        result.ownerName = cleanName(registryData.ownerName);
+        console.log(`Found owner name from registry: ${result.ownerName}`);
+      }
     }
 
     console.log(`Enrichment complete. Owner: ${result.ownerName}, Email: ${result.ownerEmail || result.companyEmail}`);
@@ -93,6 +115,31 @@ export async function enrichBusinessData(
   }
 
   return result;
+}
+
+function cleanName(name: string): string {
+  if (!name) return '';
+  
+  // Remove HTML tags
+  name = name.replace(/<[^>]*>/g, '');
+  
+  // Remove extra whitespace and newlines
+  name = name.replace(/\s+/g, ' ').trim();
+  
+  // Remove common non-name words
+  name = name.replace(/\b(profile|about|meet|contact|the|llc|inc|ltd|corp|company)\b/gi, '').trim();
+  
+  // Extract just the name part (first and last name)
+  const nameMatch = name.match(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})\b/);
+  if (nameMatch) {
+    return nameMatch[1];
+  }
+  
+  // If no match, return cleaned version
+  return name.split(/[,\n]/).filter(part => {
+    const cleaned = part.trim();
+    return cleaned.length > 3 && /^[A-Z][a-z]+(\s+[A-Z][a-z]+)*$/.test(cleaned);
+  })[0] || '';
 }
 
 async function scrapeWebsite(url: string): Promise<{
