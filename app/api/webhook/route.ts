@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { scrapeWebsite, crawlWebsite } from '@/lib/services/scraper';
 import { enrichBusinessData } from '@/lib/services/enrichment';
-import { analyzeWebsite, generateEmailCampaign } from '@/lib/services/analyzer';
+import { analyzeWebsiteWithLindy, generateEmailCampaignWithLindy } from '@/lib/services/lindy-analyzer';
 
 interface WebhookData {
   idx: number;
@@ -125,20 +125,20 @@ export async function POST(request: NextRequest) {
       }, { status: 200 });
     }
 
-    // Step 4: Generate comprehensive audit
-    const auditData = await analyzeWebsite(
+    // Step 4: Generate comprehensive audit using Lindy AI
+    const auditData = await analyzeWebsiteWithLindy(
       data.title,
       data.category,
       websiteContent || `${data.title} is a ${data.category} business located at ${data.address}`,
       reviews.map(r => r.text)
     );
 
-    // Step 5: Generate email campaign
+    // Step 5: Generate email campaign using Lindy AI
     const ownerFirstName = extractFirstName(enrichedData.ownerName);
     const businessNameClean = cleanBusinessName(data.title);
     const slug = generateSlug(businessNameClean);
 
-    const emailCampaign = await generateEmailCampaign(
+    const emailCampaign = await generateEmailCampaignWithLindy(
       data.title,
       businessNameClean,
       data.category,
