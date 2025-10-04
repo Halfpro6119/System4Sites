@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { scrapeWebsite, crawlWebsite } from '@/lib/services/scraper';
 import { enrichBusinessData } from '@/lib/services/enrichment';
-import { analyzeWebsiteWithLindy, generateEmailCampaignWithLindy } from '@/lib/services/lindy-analyzer';
+import { scrapeGoogleMapsReviews, scrapeGoogleMapsReviewsWithPuppeteer } from '@/lib/services/google-maps-scraper';
+import { generateWebsiteAudit, generateEmailCampaign } from '@/lib/services/ai-generator';
 
 interface WebhookData {
   idx: number;
@@ -39,39 +40,6 @@ function extractFirstName(fullName: string): string {
   return parts[0] || '';
 }
 
-// Generate mock reviews based on rating and business type
-function generateMockReviews(businessName: string, category: string, rating: number): Array<{ text: string; reviewer: string; rating: number }> {
-  const reviews = [
-    {
-      text: `Excellent service from ${businessName}! They were professional, timely, and exceeded my expectations. Highly recommend their ${category.toLowerCase()} services.`,
-      reviewer: 'Sarah M.',
-      rating: 5
-    },
-    {
-      text: `Very satisfied with the quality of work. The team was knowledgeable and took the time to explain everything. Will definitely use them again.`,
-      reviewer: 'Michael R.',
-      rating: 5
-    },
-    {
-      text: `Great experience overall. Professional staff, fair pricing, and excellent results. One of the best ${category.toLowerCase()} companies I've worked with.`,
-      reviewer: 'Jennifer L.',
-      rating: 5
-    },
-    {
-      text: `Outstanding service! They went above and beyond to ensure everything was perfect. Couldn't be happier with the results.`,
-      reviewer: 'David K.',
-      rating: 5
-    },
-    {
-      text: `Highly professional and reliable. They delivered exactly what they promised and the quality was top-notch. Would recommend to anyone.`,
-      reviewer: 'Amanda T.',
-      rating: 5
-    }
-  ];
-
-  return reviews.slice(0, Math.max(3, Math.floor(rating)));
-}
-
 export async function POST(request: NextRequest) {
   try {
     const data: WebhookData = await request.json();
@@ -84,7 +52,32 @@ export async function POST(request: NextRequest) {
       websiteUrl = '';
     }
 
-    // Step 1: Crawl website if available
+    // Step 1: Scrape REAL reviews from Google Maps
+    console.log('Scraping Google Maps reviews...');
+    let reviews = await scrapeGoogleMapsReviews(data.map_link);
+    
+    // If first method fails, try Puppeteer
+    if (reviews.length === 0) {
+      console.log('Trying Puppeteer method...');
+      reviews = await scrapeGoogleMapsReviewsWithPuppeteer(data.map_link);
+    }
+
+    // Parse rating from webhook data
+    const googleRating = parseFloat(data.rating) || 0;
+
+    // Step 2: Filter - must have 4+ stars and 3+ positive reviews
+    if (googleRating < 4.0 || reviews.length < 3) {
+      return NextResponse.json({
+        success: false,
+        message: 'Business does not meet minimum requirements (4+ star rating and 3+ positive reviews)',
+        rating: googleRating,
+        reviewCount: reviews.length
+      }, { status: 200 });
+    }
+
+    console.log(`Found ${reviews.length} reviews with ${googleRating} star rating`);
+
+    // Step 3: Crawl website if available
     let websiteContent = '';
     let scrapedPages: any[] = [];
     
@@ -99,56 +92,41 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Step 2: Enrich business data (owner info, reviews, ratings)
+    // Step 4: Enrich business data (owner info)
     const enrichedData = await enrichBusinessData(
       data.title,
       websiteUrl,
       data.address
     );
 
-    // Parse rating from webhook data
-    const googleRating = parseFloat(data.rating) || enrichedData.googleRating;
-
-    // Use enriched reviews or generate mock reviews if none found
-    let reviews = enrichedData.reviews;
-    if (reviews.length < 3) {
-      reviews = generateMockReviews(data.title, data.category, googleRating);
-    }
-
-    // Step 3: Filter - must have 4+ stars and 3+ positive reviews
-    if (googleRating < 4.0 || reviews.length < 3) {
-      return NextResponse.json({
-        success: false,
-        message: 'Business does not meet minimum requirements (4+ star rating and 3+ positive reviews)',
-        rating: googleRating,
-        reviewCount: reviews.length
-      }, { status: 200 });
-    }
-
-    // Step 4: Generate comprehensive audit using Lindy AI
-    const auditData = await analyzeWebsiteWithLindy(
+    // Step 5: Generate comprehensive audit using AI
+    console.log('Generating AI-powered website audit...');
+    const auditData = await generateWebsiteAudit(
       data.title,
       data.category,
       websiteContent || `${data.title} is a ${data.category} business located at ${data.address}`,
-      reviews.map(r => r.text)
+      reviews,
+      googleRating
     );
 
-    // Step 5: Generate email campaign using Lindy AI
+    // Step 6: Generate email campaign using AI
+    console.log('Generating AI-powered email campaign...');
     const ownerFirstName = extractFirstName(enrichedData.ownerName);
     const businessNameClean = cleanBusinessName(data.title);
     const slug = generateSlug(businessNameClean);
 
-    const emailCampaign = await generateEmailCampaignWithLindy(
+    const emailCampaign = await generateEmailCampaign(
       data.title,
       businessNameClean,
       data.category,
       ownerFirstName,
       auditData.icebreaker,
       auditData.painPoints,
-      slug
+      slug,
+      reviews
     );
 
-    // Step 6: Format final JSON response
+    // Step 7: Format final JSON response
     const finalResponse = {
       slug: slug,
       business_name: data.title,
@@ -210,6 +188,7 @@ export async function POST(request: NextRequest) {
       follow_up5: emailCampaign.followUp5
     };
 
+    console.log('Successfully generated complete response');
     return NextResponse.json(finalResponse, { status: 200 });
 
   } catch (error) {
