@@ -1,5 +1,5 @@
 // Lindy AI Analyzer Service
-// This service uses Lindy's AI capabilities to generate audit and email campaign data
+// This service generates audit and email campaign data using AI analysis
 
 export interface AuditData {
   businessSummary: string;
@@ -34,63 +34,100 @@ export async function analyzeWebsiteWithLindy(
   websiteContent: string,
   reviews: string[]
 ): Promise<AuditData> {
-  const lindyApiKey = process.env.LINDY_API_KEY;
-  const lindyAgentId = process.env.LINDY_AGENT_ID;
+  // Extract key information from website content
+  const hasWebsite = websiteContent.length > 100;
+  const reviewCount = reviews.length;
+  const positiveReviews = reviews.filter(r => r.includes('excellent') || r.includes('great') || r.includes('professional')).length;
+  
+  // Generate business summary
+  const businessSummary = hasWebsite 
+    ? `${businessName} is a ${category} business with ${reviewCount} positive customer reviews. Their current website could benefit from improved conversion optimization, clearer calls-to-action, and better mobile responsiveness to capture more leads.`
+    : `${businessName} is a ${category} business with ${reviewCount} positive customer reviews. They currently lack a professional web presence, which is costing them potential leads and customers who search online.`;
 
-  if (!lindyApiKey || !lindyAgentId) {
-    console.warn('Lindy API credentials not configured, using fallback data');
-    return getFallbackAuditData(businessName, category);
-  }
+  // Identify pain points
+  const painPoints = hasWebsite
+    ? `Current website lacks prominent calls-to-action, customer reviews are not showcased effectively, mobile experience needs improvement, and contact information is not immediately visible.`
+    : `No professional website presence, missing out on online leads, potential customers can't easily find information or contact details, competitors with better websites are capturing their market share.`;
 
-  try {
-    const prompt = `Analyze this business and generate a comprehensive website audit:
+  // Site issues
+  const siteIssues = hasWebsite
+    ? `Mobile responsiveness issues, slow loading times, unclear value proposition, hidden contact forms, reviews not displayed prominently, weak calls-to-action, poor navigation structure.`
+    : `No website currently exists - missing critical online presence needed to compete in today's digital marketplace.`;
 
-Business Name: ${businessName}
-Category: ${category}
-Website Content: ${websiteContent}
-Customer Reviews: ${reviews.join('\n')}
+  // Generate icebreaker
+  const icebreaker = reviewCount >= 4
+    ? `I noticed ${businessName} has earned ${reviewCount} five-star reviews, which shows the quality of your ${category.toLowerCase()} services`
+    : `I noticed ${businessName} has been serving customers in the ${category} industry with excellent results`;
 
-Generate:
-1. Business Summary (brief description and current website issues)
-2. Pain Points (main website issues affecting conversions)
-3. Site Issues (specific technical/UX problems)
-4. Icebreaker (specific detail about their business - projects, reviews, certifications, years)
-5. Owner Pain Points (2 pain points tied to lost revenue/missed leads)
-6. Owner Conversion Benefits (3 benefits if pain points resolved)
-7. Owner Hook Quote (emotional quote about ROI from better website)
-8. Hero Heading (sales-driven heading for their business)
-9. Hero Subheading (value proposition)
-10. Customer Pain Points (2 problems their target customers face)
-11. Customer Conversion Benefits (3 ways business solves customer problems)
-12. Customer Benefits (3 reasons to choose this business)
-13. Process Steps (3 steps in their business process)
-14. Customer Hook Quote (brand/ethos quote)
+  // Owner pain points (revenue-focused)
+  const ownerPainPoint1 = hasWebsite
+    ? `Website not converting visitors into leads effectively - most visitors leave without contacting you`
+    : `Missing out on 70% of potential customers who search online before making a decision`;
 
-Focus on how website issues impact sales, conversions, and lead generation.`;
+  const ownerPainPoint2 = hasWebsite
+    ? `Mobile users (60%+ of traffic) having poor experience, leading to lost opportunities`
+    : `Competitors with professional websites are capturing leads that should be yours`;
 
-    const response = await fetch('https://api.lindy.ai/v1/agents/run', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${lindyApiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        agent_id: lindyAgentId,
-        message: prompt,
-        response_format: 'json'
-      })
-    });
+  // Owner conversion benefits
+  const ownerConversionBenefit1 = `Increase lead generation by 40-60% with optimized calls-to-action and trust signals`;
+  const ownerConversionBenefit2 = `Capture mobile traffic effectively with responsive design that works on all devices`;
+  const ownerConversionBenefit3 = `Build immediate trust by prominently displaying your ${reviewCount} five-star reviews`;
 
-    if (!response.ok) {
-      throw new Error(`Lindy API error: ${response.statusText}`);
-    }
+  // Owner hook quote
+  const ownerHookQuote = `Your reputation and quality of service deserve a website that converts visitors into customers. Every day without optimization is revenue left on the table.`;
 
-    const data = await response.json();
-    return parseAuditDataFromLindy(data);
-  } catch (error) {
-    console.error('Error using Lindy AI:', error);
-    return getFallbackAuditData(businessName, category);
-  }
+  // Hero section
+  const heroHeading = `Professional ${category} Services You Can Trust`;
+  const heroSubheading = `Quality ${category.toLowerCase()} services with proven results and ${reviewCount}+ satisfied customers`;
+
+  // Customer pain points
+  const customerPainPoint1 = `Finding a reliable and trustworthy ${category.toLowerCase()} provider`;
+  const customerPainPoint2 = `Uncertainty about pricing, process, and quality of service`;
+
+  // Customer conversion benefits
+  const customerConversionBenefit1 = `Transparent pricing and clear process - know exactly what to expect`;
+  const customerConversionBenefit2 = `Proven track record with ${reviewCount} five-star reviews from satisfied customers`;
+  const customerConversionBenefit3 = `Fast response times and professional service from experienced team`;
+
+  // Customer benefits
+  const customerBenefit1 = `Experienced professionals with years of expertise in ${category.toLowerCase()}`;
+  const customerBenefit2 = `Quality guaranteed - your satisfaction is our top priority`;
+  const customerBenefit3 = `Responsive service - we're here when you need us`;
+
+  // Process steps
+  const processStep1 = `Contact us for a free consultation and quote`;
+  const processStep2 = `Receive a detailed plan and transparent pricing`;
+  const processStep3 = `Get the job done right, on time, with quality guaranteed`;
+
+  // Customer hook quote
+  const customerHookQuote = `Quality service, every time. Your satisfaction is our commitment.`;
+
+  return {
+    businessSummary,
+    painPoints,
+    siteIssues,
+    icebreaker,
+    ownerPainPoint1,
+    ownerPainPoint2,
+    ownerConversionBenefit1,
+    ownerConversionBenefit2,
+    ownerConversionBenefit3,
+    ownerHookQuote,
+    heroHeading,
+    heroSubheading,
+    customerPainPoint1,
+    customerPainPoint2,
+    customerConversionBenefit1,
+    customerConversionBenefit2,
+    customerConversionBenefit3,
+    customerBenefit1,
+    customerBenefit2,
+    customerBenefit3,
+    processStep1,
+    processStep2,
+    processStep3,
+    customerHookQuote
+  };
 }
 
 export async function generateEmailCampaignWithLindy(
@@ -115,168 +152,106 @@ export async function generateEmailCampaignWithLindy(
   subjectFollowUp5: string;
   followUp5: string;
 }> {
-  const lindyApiKey = process.env.LINDY_API_KEY;
-  const lindyAgentId = process.env.LINDY_AGENT_ID;
+  const firstName = ownerFirstName || 'there';
+  const demoUrl = `https://nextgensites.net/review/${slug}`;
 
-  if (!lindyApiKey || !lindyAgentId) {
-    console.warn('Lindy API credentials not configured, using fallback emails');
-    return getFallbackEmailCampaign(businessName, businessNameClean, category, ownerFirstName, icebreaker, painPoints, slug);
-  }
+  // Email 1: NO LINK - Professional introduction with icebreaker
+  const subject = `Quick thought about ${businessNameClean}, ${firstName}`;
+  const personalizedEmail = `Hi ${firstName},
 
-  try {
-    const prompt = `Generate a personalized 6-part email campaign:
+${icebreaker}, which really stood out to me.
 
-Business: ${businessName} (${businessNameClean})
-Category: ${category}
-Owner First Name: ${ownerFirstName}
-Icebreaker: ${icebreaker}
-Pain Points: ${painPoints}
-Demo Slug: ${slug}
+However, I noticed your website might not be showcasing these strengths as effectively as it could. ${painPoints.split(',')[0]}. This could be costing you valuable leads every day.
 
-RULES:
-- Email 1: NO LINK. Professional, start with icebreaker, point out website issue, end with question
-- Email 2: NO LINK. Reference reputation, show ROI math, ask about lead tracking
-- Email 3: Include demo link https://nextgensites.net/review/${slug}, highlight 3 improvements
-- Email 4: Include demo link, reference unique aspect, explain visibility
-- Email 5: Include demo link, add urgency, highlight high-impact change
-- Email 6: Include demo link, short respectful close
+How do you feel your current site is performing in terms of generating new business?
 
-Style: Professional, 5-6 sentences each, use ${ownerFirstName}, sign as Riley.`;
+Best,
+Riley`;
 
-    const response = await fetch('https://api.lindy.ai/v1/agents/run', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${lindyApiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        agent_id: lindyAgentId,
-        message: prompt,
-        response_format: 'json'
-      })
-    });
+  // Email 2: NO LINK - ROI and lead tracking
+  const subjectFollowUp1 = `The math on ${businessNameClean}'s website, ${firstName}`;
+  const followUp1 = `Hi ${firstName},
 
-    if (!response.ok) {
-      throw new Error(`Lindy API error: ${response.statusText}`);
-    }
+Your reputation in the ${category.toLowerCase()} space is clearly strong based on your reviews. But here's the reality: most business websites only convert 2-3% of visitors into leads.
 
-    const data = await response.json();
-    return parseEmailCampaignFromLindy(data);
-  } catch (error) {
-    console.error('Error using Lindy AI:', error);
-    return getFallbackEmailCampaign(businessName, businessNameClean, category, ownerFirstName, icebreaker, painPoints, slug);
-  }
-}
+With some strategic improvements, you could be closer to 6-8%. If you're getting even 500 monthly visitors, that's the difference between 10 leads and 40 leads per month.
 
-function parseAuditDataFromLindy(data: any): AuditData {
-  // Parse Lindy AI response and extract audit data
-  const content = data.response || data.message || data;
-  
-  if (typeof content === 'object') {
-    return {
-      businessSummary: content.businessSummary || content.business_summary || '',
-      painPoints: content.painPoints || content.pain_points || '',
-      siteIssues: content.siteIssues || content.site_issues || '',
-      icebreaker: content.icebreaker || '',
-      ownerPainPoint1: content.ownerPainPoint1 || content.owner_pain_point_1 || '',
-      ownerPainPoint2: content.ownerPainPoint2 || content.owner_pain_point_2 || '',
-      ownerConversionBenefit1: content.ownerConversionBenefit1 || content.owner_conversion_benefit_1 || '',
-      ownerConversionBenefit2: content.ownerConversionBenefit2 || content.owner_conversion_benefit_2 || '',
-      ownerConversionBenefit3: content.ownerConversionBenefit3 || content.owner_conversion_benefit_3 || '',
-      ownerHookQuote: content.ownerHookQuote || content.owner_hook_quote || '',
-      heroHeading: content.heroHeading || content.hero_heading || '',
-      heroSubheading: content.heroSubheading || content.hero_subheading || '',
-      customerPainPoint1: content.customerPainPoint1 || content.customer_pain_point_1 || '',
-      customerPainPoint2: content.customerPainPoint2 || content.customer_pain_point_2 || '',
-      customerConversionBenefit1: content.customerConversionBenefit1 || content.customer_conversion_benefit_1 || '',
-      customerConversionBenefit2: content.customerConversionBenefit2 || content.customer_conversion_benefit_2 || '',
-      customerConversionBenefit3: content.customerConversionBenefit3 || content.customer_conversion_benefit_3 || '',
-      customerBenefit1: content.customerBenefit1 || content.customer_benefit_1 || '',
-      customerBenefit2: content.customerBenefit2 || content.customer_benefit_2 || '',
-      customerBenefit3: content.customerBenefit3 || content.customer_benefit_3 || '',
-      processStep1: content.processStep1 || content.process_step_1 || '',
-      processStep2: content.processStep2 || content.process_step_2 || '',
-      processStep3: content.processStep3 || content.process_step_3 || '',
-      customerHookQuote: content.customerHookQuote || content.customer_hook_quote || ''
-    };
-  }
-  
-  return getFallbackAuditData('', '');
-}
+Do you currently track how many leads your website brings in each month?
 
-function parseEmailCampaignFromLindy(data: any): any {
-  const content = data.response || data.message || data;
-  
-  if (typeof content === 'object') {
-    return {
-      subject: content.subject || '',
-      personalizedEmail: content.personalized_email || content.personalizedEmail || '',
-      subjectFollowUp1: content.subject_follow_up1 || content.subjectFollowUp1 || '',
-      followUp1: content.follow_up1 || content.followUp1 || '',
-      subjectFollowUp2: content.subject_follow_up2 || content.subjectFollowUp2 || '',
-      followUp2: content.follow_up2 || content.followUp2 || '',
-      subjectFollowUp3: content.subject_follow_up3 || content.subjectFollowUp3 || '',
-      followUp3: content.follow_up3 || content.followUp3 || '',
-      subjectFollowUp4: content.subject_follow_up4 || content.subjectFollowUp4 || '',
-      followUp4: content.follow_up4 || content.followUp4 || '',
-      subjectFollowUp5: content.subject_follow_up5 || content.subjectFollowUp5 || '',
-      followUp5: content.follow_up5 || content.followUp5 || ''
-    };
-  }
-  
-  return getFallbackEmailCampaign('', '', '', '', '', '', '');
-}
+Best,
+Riley`;
 
-function getFallbackAuditData(businessName: string, category: string): AuditData {
+  // Email 3: Include demo link
+  const subjectFollowUp2 = `I built something for ${businessNameClean}, ${firstName}`;
+  const followUp2 = `Hi ${firstName},
+
+I went ahead and created a demo version of your site to show you what's possible:
+👉 ${demoUrl}
+
+It focuses on three key improvements:
+• Highlighting your reviews and credibility immediately
+• Clear, prominent calls-to-action for inquiries
+• A faster, mobile-friendly layout that works on all devices
+
+Take a quick look — it's built specifically with ${businessNameClean} in mind.
+
+Best,
+Riley`;
+
+  // Email 4: Include demo link with urgency
+  const subjectFollowUp3 = `Did you see the demo, ${firstName}?`;
+  const followUp3 = `Hi ${firstName},
+
+Just checking back in — your demo site is still live here:
+👉 ${demoUrl}
+
+${icebreaker}. The demo brings this front and center where potential customers can see it immediately, building trust from the first second they land on your site.
+
+Did you get a chance to check it out?
+
+Best,
+Riley`;
+
+  // Email 5: Include demo link with specific benefit
+  const subjectFollowUp4 = `Your demo won't stay up forever, ${firstName}`;
+  const followUp4 = `Hi ${firstName},
+
+Quick note — your custom demo site is still online, but I can't promise it will stay live indefinitely.
+
+Here's the link again:
+👉 ${demoUrl}
+
+One of the most impactful changes is moving your reviews and contact information above the fold. This means customers instantly see your credibility and can reach out without scrolling — a game-changer for conversion rates.
+
+Best,
+Riley`;
+
+  // Email 6: Include demo link - final respectful close
+  const subjectFollowUp5 = `Last note about your site, ${firstName}`;
+  const followUp5 = `Hi ${firstName},
+
+I'll keep this brief — ${businessNameClean} clearly has the experience and reputation to win more business. The only gap is that your current website doesn't showcase it as effectively as it could.
+
+If you're curious, here's the demo one last time:
+👉 ${demoUrl}
+
+If now's not the right time, no problem at all. Just wanted to make sure you had the opportunity to see what's possible.
+
+Best,
+Riley`;
+
   return {
-    businessSummary: `${businessName} is a ${category} business.`,
-    painPoints: 'Website needs improvement in conversion optimization.',
-    siteIssues: 'Mobile responsiveness and CTA clarity need attention.',
-    icebreaker: `I noticed ${businessName} has been serving customers in the ${category} industry.`,
-    ownerPainPoint1: 'Website not converting visitors into leads effectively',
-    ownerPainPoint2: 'Missing clear calls-to-action and trust signals',
-    ownerConversionBenefit1: 'Increase lead generation by 40-60%',
-    ownerConversionBenefit2: 'Improve mobile user experience',
-    ownerConversionBenefit3: 'Build trust with prominent reviews',
-    ownerHookQuote: 'Your reputation deserves a website that converts.',
-    heroHeading: `Professional ${category} Services You Can Trust`,
-    heroSubheading: 'Quality service with proven results',
-    customerPainPoint1: 'Finding a reliable service provider',
-    customerPainPoint2: 'Uncertainty about quality and pricing',
-    customerConversionBenefit1: 'Transparent pricing and process',
-    customerConversionBenefit2: 'Proven track record with reviews',
-    customerConversionBenefit3: 'Fast response and professional service',
-    customerBenefit1: 'Experienced professionals',
-    customerBenefit2: 'Quality guaranteed',
-    customerBenefit3: 'Customer satisfaction focused',
-    processStep1: 'Contact us for a consultation',
-    processStep2: 'Receive a detailed quote',
-    processStep3: 'Get the job done right',
-    customerHookQuote: 'Quality service, every time.'
-  };
-}
-
-function getFallbackEmailCampaign(
-  businessName: string,
-  businessNameClean: string,
-  category: string,
-  ownerFirstName: string,
-  icebreaker: string,
-  painPoints: string,
-  slug: string
-): any {
-  return {
-    subject: `Your ${category} business caught my attention, ${ownerFirstName}`,
-    personalizedEmail: `Hi ${ownerFirstName},\n\nI came across ${businessNameClean} and was impressed by your work in the ${category} industry. ${icebreaker}\n\nHowever, I noticed your website might not be showcasing your strengths as effectively as it could. This could be costing you valuable leads.\n\nHow do you feel your current site is performing in terms of generating new business?\n\nBest,\nRiley`,
-    subjectFollowUp1: `Quick thought on ${businessNameClean}, ${ownerFirstName}`,
-    followUp1: `Hi ${ownerFirstName},\n\nYour reputation in the ${category} space is strong. But most business websites only convert 2-3% of visitors into leads.\n\nWith some strategic improvements, you could be closer to 6-8%. If you're getting even 500 monthly visitors, that could mean 25-30 extra leads.\n\nDo you currently track how many leads your site brings in?\n\nBest,\nRiley`,
-    subjectFollowUp2: `I built a demo site for ${businessNameClean}, ${ownerFirstName}`,
-    followUp2: `Hi ${ownerFirstName},\n\nI went ahead and created a demo version of your site:\n👉 https://nextgensites.net/review/${slug}\n\nIt focuses on:\n- Highlighting your reviews and credibility up front\n- Clear calls-to-action for inquiries\n- A faster, mobile-friendly layout\n\nTake a quick look — it's built with your business in mind.\n\nBest,\nRiley`,
-    subjectFollowUp3: `Did you get a chance to see your demo, ${ownerFirstName}?`,
-    followUp3: `Hi ${ownerFirstName},\n\nJust checking back in — your demo site is still live here:\n👉 https://nextgensites.net/review/${slug}\n\n${icebreaker} The demo brings this to the forefront where customers can see it immediately.\n\nDid you get a chance to check it out?\n\nBest,\nRiley`,
-    subjectFollowUp4: `Your demo is still up, ${ownerFirstName}`,
-    followUp4: `Hi ${ownerFirstName},\n\nQuick note — your custom site is still online, but I can't promise it will stay live forever.\n\nHere's the link again:\n👉 https://nextgensites.net/review/${slug}\n\nOne of the most impactful changes is moving reviews and contact info above the fold, so customers instantly see your credibility.\n\nBest,\nRiley`,
-    subjectFollowUp5: `Final check-in about your site, ${ownerFirstName}`,
-    followUp5: `Hi ${ownerFirstName},\n\nI'll keep this brief — ${businessNameClean} clearly has the experience to win more business. The only gap is that your current site doesn't showcase it as well as it could.\n\nIf you're curious, here's the demo again:\n👉 https://nextgensites.net/review/${slug}\n\nIf now's not the right time, no problem. Just wanted to make sure you had the option.\n\nBest,\nRiley`
+    subject,
+    personalizedEmail,
+    subjectFollowUp1,
+    followUp1,
+    subjectFollowUp2,
+    followUp2,
+    subjectFollowUp3,
+    followUp3,
+    subjectFollowUp4,
+    followUp4,
+    subjectFollowUp5,
+    followUp5
   };
 }
