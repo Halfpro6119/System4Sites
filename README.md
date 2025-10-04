@@ -1,36 +1,93 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# System4Sites - Business Lead Enrichment & Email Campaign Generator
 
-## Getting Started
+A Next.js application that receives business data via webhook, enriches it with web scraping and AI analysis, and generates personalized email campaigns.
 
-First, run the development server:
+## Features
 
+- **Webhook Endpoint**: POST `/api/webhook` to process business data
+- **Web Crawling**: Automatically scrapes business websites for content
+- **Lead Enrichment**: Finds owner information, reviews, and ratings
+- **Smart Filtering**: Only processes businesses with 4+ star rating and 3+ positive reviews
+- **AI-Powered Analysis**: Generates comprehensive website audits using OpenAI
+- **Email Campaign Generation**: Creates personalized 6-email sequences with demo links
+
+## Setup
+
+1. Clone the repository:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/Halfpro6119/System4Sites.git
+cd System4Sites
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Install dependencies:
+```bash
+bun install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Create `.env.local` file:
+```bash
+OPENAI_API_KEY=your_openai_api_key_here
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. Run the development server:
+```bash
+bun run dev
+```
 
-## Learn More
+5. Open [http://localhost:3000](http://localhost:3000)
 
-To learn more about Next.js, take a look at the following resources:
+## API Usage
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### POST /api/webhook
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Send business data in this format:
 
-## Deploy on Vercel
+```json
+{
+  "idx": 0,
+  "RowNumber": 1758873406,
+  "title": "PINQ Staffing LLC",
+  "map_link": "https://www.google.com/maps/...",
+  "cover_image": "https://...",
+  "rating": "5.0",
+  "category": "Employment agency",
+  "address": "1019 E 54th St N, Tulsa, OK 74126",
+  "webpage": "https://example.com",
+  "phone_number": "(918) 764-8757",
+  "working_hours": "",
+  "Used": false
+}
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Response
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Returns comprehensive JSON with:
+- Business audit data
+- Owner information
+- Website analysis
+- 6-part email campaign
+- Reviews and ratings
+
+## Tech Stack
+
+- **Next.js 15** - React framework
+- **TypeScript** - Type safety
+- **Tailwind CSS** - Styling
+- **shadcn/ui** - UI components
+- **OpenAI GPT-4** - AI analysis
+- **Cheerio** - Web scraping
+- **Axios** - HTTP requests
+
+## Deployment
+
+Deploy to Vercel:
+
+```bash
+vercel
+```
+
+Make sure to add your `OPENAI_API_KEY` to Vercel environment variables.
+
+## License
+
+MIT
