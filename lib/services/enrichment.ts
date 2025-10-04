@@ -41,7 +41,7 @@ export async function enrichBusinessData(
       const websiteData = await scrapeWebsite(website);
       
       if (websiteData.ownerName) {
-        result.ownerName = cleanName(websiteData.ownerName);
+        result.ownerName = websiteData.ownerName;
         console.log(`Found owner name from website: ${result.ownerName}`);
       }
       if (websiteData.emails.length > 0) {
@@ -72,7 +72,7 @@ export async function enrichBusinessData(
       console.log('Searching LinkedIn...');
       const linkedinData = await searchLinkedIn(businessName, address);
       if (linkedinData.ownerName && !result.ownerName) {
-        result.ownerName = cleanName(linkedinData.ownerName);
+        result.ownerName = linkedinData.ownerName;
         console.log(`Found owner name from LinkedIn: ${result.ownerName}`);
       }
       if (linkedinData.linkedin && !result.linkedin) {
@@ -103,7 +103,7 @@ export async function enrichBusinessData(
       console.log('Searching business registries...');
       const registryData = await searchBusinessRegistry(businessName, address);
       if (registryData.ownerName) {
-        result.ownerName = cleanName(registryData.ownerName);
+        result.ownerName = registryData.ownerName;
         console.log(`Found owner name from registry: ${result.ownerName}`);
       }
     }
@@ -117,29 +117,42 @@ export async function enrichBusinessData(
   return result;
 }
 
-function cleanName(name: string): string {
-  if (!name) return '';
+function extractCleanText($: cheerio.CheerioAPI): string {
+  // Remove script and style elements
+  $('script, style, noscript, iframe').remove();
   
-  // Remove HTML tags
-  name = name.replace(/<[^>]*>/g, '');
+  // Get text and clean it
+  let text = $.text();
   
-  // Remove extra whitespace and newlines
-  name = name.replace(/\s+/g, ' ').trim();
+  // Remove excessive whitespace and newlines
+  text = text.replace(/\s+/g, ' ').trim();
   
-  // Remove common non-name words
-  name = name.replace(/\b(profile|about|meet|contact|the|llc|inc|ltd|corp|company)\b/gi, '').trim();
-  
-  // Extract just the name part (first and last name)
-  const nameMatch = name.match(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})\b/);
-  if (nameMatch) {
-    return nameMatch[1];
+  return text;
+}
+
+function extractOwnerName(text: string): string {
+  // Owner name patterns - looking for proper names near title keywords
+  const patterns = [
+    // "Founded by John Smith" or "Owner: John Smith"
+    /(?:founded by|owner|ceo|president|founder)[:\s]+([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i,
+    // "John Smith, Owner" or "John Smith - CEO"
+    /\b([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)[,\s]*[-–]\s*(?:owner|ceo|president|founder)/i,
+    // "Meet John Smith" in headings
+    /(?:meet|about)\s+([A-Z][a-z]+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match && match[1]) {
+      const name = match[1].trim();
+      // Validate it's a real name (2-3 words, each capitalized)
+      if (/^[A-Z][a-z]+(\s+[A-Z][a-z]+){1,2}$/.test(name)) {
+        return name;
+      }
+    }
   }
-  
-  // If no match, return cleaned version
-  return name.split(/[,\n]/).filter(part => {
-    const cleaned = part.trim();
-    return cleaned.length > 3 && /^[A-Z][a-z]+(\s+[A-Z][a-z]+)*$/.test(cleaned);
-  })[0] || '';
+
+  return '';
 }
 
 async function scrapeWebsite(url: string): Promise<{
@@ -167,26 +180,15 @@ async function scrapeWebsite(url: string): Promise<{
     });
 
     const $ = cheerio.load(response.data);
-    const text = $.text();
+    
+    // Extract clean text
+    const cleanText = extractCleanText($);
+    
+    // Extract owner name from clean text
+    result.ownerName = extractOwnerName(cleanText);
+
+    // Extract emails from HTML
     const html = response.data;
-
-    // Extract owner name from common patterns
-    const ownerPatterns = [
-      /(?:founded by|owner|ceo|president|founder)[:\s]+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/gi,
-      /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)[,\s]+(?:owner|ceo|president|founder)/gi,
-      /<h[1-6][^>]*>(?:meet|about)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/gi,
-      /(?:contact|reach)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/gi
-    ];
-
-    for (const pattern of ownerPatterns) {
-      const matches = [...text.matchAll(pattern)];
-      if (matches.length > 0 && matches[0][1]) {
-        result.ownerName = matches[0][1].trim();
-        break;
-      }
-    }
-
-    // Extract emails
     const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
     const emailMatches = html.match(emailRegex) || [];
     result.emails = [...new Set(emailMatches)].filter(email => 
@@ -211,32 +213,32 @@ async function scrapeWebsite(url: string): Promise<{
       }
     });
 
-    // Try to scrape About page for more info
-    const aboutLinks = $('a[href*="about"], a[href*="team"], a[href*="contact"]').slice(0, 3);
-    for (let i = 0; i < aboutLinks.length; i++) {
-      const aboutHref = $(aboutLinks[i]).attr('href');
-      if (aboutHref && !result.ownerName) {
-        try {
-          const aboutUrl = new URL(aboutHref, url).href;
-          const aboutResponse = await axios.get(aboutUrl, {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            },
-            timeout: 5000
-          });
-          
-          const $about = cheerio.load(aboutResponse.data);
-          const aboutText = $about.text();
-          
-          for (const pattern of ownerPatterns) {
-            const matches = [...aboutText.matchAll(pattern)];
-            if (matches.length > 0 && matches[0][1]) {
-              result.ownerName = matches[0][1].trim();
+    // Try to scrape About/Team/Contact pages for more info
+    if (!result.ownerName) {
+      const aboutLinks = $('a[href*="about"], a[href*="team"], a[href*="contact"]').slice(0, 2);
+      for (let i = 0; i < aboutLinks.length; i++) {
+        const aboutHref = $(aboutLinks[i]).attr('href');
+        if (aboutHref) {
+          try {
+            const aboutUrl = new URL(aboutHref, url).href;
+            const aboutResponse = await axios.get(aboutUrl, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+              },
+              timeout: 5000
+            });
+            
+            const $about = cheerio.load(aboutResponse.data);
+            const aboutText = extractCleanText($about);
+            const ownerName = extractOwnerName(aboutText);
+            
+            if (ownerName) {
+              result.ownerName = ownerName;
               break;
             }
+          } catch (err) {
+            // Continue if about page fails
           }
-        } catch (err) {
-          // Continue if about page fails
         }
       }
     }
@@ -276,13 +278,11 @@ async function searchLinkedIn(businessName: string, address: string): Promise<{
     });
 
     // Try to extract owner name from snippets
-    $('.g').each((_, elem) => {
-      const text = $(elem).text();
-      const ownerMatch = text.match(/([A-Z][a-z]+\s+[A-Z][a-z]+)\s*[-–]\s*(?:Owner|CEO|Founder|President)/i);
-      if (ownerMatch && !result.ownerName) {
-        result.ownerName = ownerMatch[1];
-      }
-    });
+    const text = extractCleanText($);
+    const ownerMatch = text.match(/\b([A-Z][a-z]+\s+[A-Z][a-z]+)\s*[-–]\s*(?:Owner|CEO|Founder|President)/i);
+    if (ownerMatch) {
+      result.ownerName = ownerMatch[1];
+    }
 
   } catch (error) {
     console.error('Error searching LinkedIn:', error);
@@ -343,20 +343,12 @@ async function searchBusinessRegistry(businessName: string, address: string): Pr
     });
 
     const $ = cheerio.load(response.data);
-    const text = $.text();
+    const text = extractCleanText($);
     
     // Look for registered agent or owner patterns
-    const patterns = [
-      /(?:registered agent|owner|principal)[:\s]+([A-Z][a-z]+\s+[A-Z][a-z]+)/gi,
-      /([A-Z][a-z]+\s+[A-Z][a-z]+)[,\s]+(?:registered agent|owner|principal)/gi
-    ];
-
-    for (const pattern of patterns) {
-      const match = text.match(pattern);
-      if (match && match[1]) {
-        result.ownerName = match[1].trim();
-        break;
-      }
+    const ownerMatch = text.match(/(?:registered agent|owner|principal)[:\s]+([A-Z][a-z]+\s+[A-Z][a-z]+)/i);
+    if (ownerMatch) {
+      result.ownerName = ownerMatch[1];
     }
 
   } catch (error) {
@@ -384,7 +376,7 @@ function findOwnerEmail(emails: string[], ownerName: string): string {
       localPart === `${firstName[0]}${lastName}` ||
       localPart === `${firstName}.${lastName[0]}` ||
       localPart === firstName ||
-      localPart.includes(firstName) && localPart.includes(lastName)
+      (localPart.includes(firstName) && localPart.includes(lastName))
     ) {
       return email;
     }
